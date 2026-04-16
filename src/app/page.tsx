@@ -1,7 +1,7 @@
 "use client";
 
 import { CopilotChat } from "@copilotkit/react-ui";
-import { useCopilotChat } from "@copilotkit/react-core";
+import { useCopilotChatInternal } from "@copilotkit/react-core";
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import Providers from "./providers";
 import { useThreads } from "@/hooks/useThreads";
@@ -13,38 +13,46 @@ type ChatLayoutProps = {
 
 function ChatLayout({ currentThreadId, onChangeThreadId }: ChatLayoutProps) {
   const { threads, isLoading, error, refreshThreads, saveThread } = useThreads();
-  const { messages: chatMessages } = useCopilotChat();
+  const { messages } = useCopilotChatInternal();
+  const chatMessages = messages ?? [];
   const lastSavedRef = useRef<string>("");
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    const currentMessagesKey = JSON.stringify(chatMessages);
-    
-    if (chatMessages.length === 0 || currentMessagesKey === lastSavedRef.current || isSaving) {
+    if (chatMessages.length === 0 || isSaving) {
       return;
     }
-    
+
     const userMessages = chatMessages.filter((m: any) => m.role === "user");
     if (userMessages.length === 0) {
       return;
     }
-    
+
+    const currentMessagesKey = JSON.stringify(chatMessages.map((m: any) => ({ role: m.role, content: m.content })));
+    if (currentMessagesKey === lastSavedRef.current) {
+      return;
+    }
+
     const timer = setTimeout(async () => {
       setIsSaving(true);
       try {
-        const firstMessage = userMessages[0].content;
-        const name = firstMessage.slice(0, 20);
-        const formattedMessages = chatMessages.map((m: any) => ({
-          role: m.role,
-          content: m.content,
-        }));
+        const firstUserContent = typeof userMessages[0].content === "string"
+          ? userMessages[0].content
+          : JSON.stringify(userMessages[0].content);
+        const name = firstUserContent.slice(0, 20);
+        const formattedMessages = chatMessages
+          .filter((m: any) => m.role === "user" || m.role === "assistant")
+          .map((m: any) => ({
+            role: m.role,
+            content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
+          }));
         await saveThread(currentThreadId, name, formattedMessages);
         lastSavedRef.current = currentMessagesKey;
       } finally {
         setIsSaving(false);
       }
     }, 1000);
-    
+
     return () => clearTimeout(timer);
   }, [chatMessages, currentThreadId, saveThread, isSaving]);
 
@@ -52,16 +60,20 @@ function ChatLayout({ currentThreadId, onChangeThreadId }: ChatLayoutProps) {
     if (chatMessages.length > 0) {
       const userMessages = chatMessages.filter((m: any) => m.role === "user");
       if (userMessages.length > 0) {
-        const firstMessage = userMessages[0].content;
-        const name = firstMessage.slice(0, 20);
-        const formattedMessages = chatMessages.map((m: any) => ({
-          role: m.role,
-          content: m.content,
-        }));
+        const firstUserContent = typeof userMessages[0].content === "string"
+          ? userMessages[0].content
+          : JSON.stringify(userMessages[0].content);
+        const name = firstUserContent.slice(0, 20);
+        const formattedMessages = chatMessages
+          .filter((m: any) => m.role === "user" || m.role === "assistant")
+          .map((m: any) => ({
+            role: m.role,
+            content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
+          }));
         await saveThread(currentThreadId, name, formattedMessages);
       }
     }
-    
+
     const newId = crypto.randomUUID();
     onChangeThreadId(newId);
     lastSavedRef.current = "";
@@ -70,7 +82,7 @@ function ChatLayout({ currentThreadId, onChangeThreadId }: ChatLayoutProps) {
   const sortedThreads = useMemo(
     () =>
       [...threads].sort(
-        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       ),
     [threads],
   );
@@ -81,9 +93,9 @@ function ChatLayout({ currentThreadId, onChangeThreadId }: ChatLayoutProps) {
     return current.name || `会话 ${current.id.slice(0, 8)}`;
   }, [currentThreadId, sortedThreads]);
 
-  const handleCreateThread = () => {
-    onChangeThreadId(crypto.randomUUID());
-  };
+  // const handleCreateThread = () => {
+  //   onChangeThreadId(crypto.randomUUID());
+  // };
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl p-4 md:p-6">

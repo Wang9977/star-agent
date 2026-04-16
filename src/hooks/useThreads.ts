@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 
 export interface Thread {
   id: string;
@@ -23,8 +23,12 @@ export function useThreads(): UseThreadsResult {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const initializedRef = useRef(false);
+
   const refreshThreads = useCallback(async () => {
-    setIsLoading(true);
+    if (!initializedRef.current) {
+      setIsLoading(true);
+    }
     setError(null);
     try {
       const response = await fetch("/api/threads");
@@ -37,6 +41,7 @@ export function useThreads(): UseThreadsResult {
       setError(e instanceof Error ? e.message : "Failed to load threads");
     } finally {
       setIsLoading(false);
+      initializedRef.current = true;
     }
   }, []);
 
@@ -51,11 +56,11 @@ export function useThreads(): UseThreadsResult {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, name, messages }),
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
-      
+
       const payload = await response.json();
       await refreshThreads();
       return payload.thread;
@@ -76,11 +81,11 @@ export function useThreads(): UseThreadsResult {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, name, messages }),
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
-      
+
       const payload = await response.json();
       await refreshThreads();
       return payload.thread;

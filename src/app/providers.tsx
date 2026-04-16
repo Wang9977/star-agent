@@ -6,10 +6,13 @@ import type { ReactNode } from "react";
 
 type ProvidersProps = {
   children: ReactNode;
+  threadId?: string;
 };
 
-export default function Providers({ children }: ProvidersProps) {
+export default function Providers({ children, threadId }: ProvidersProps) {
   return (
-    <CopilotKit runtimeUrl="/api/copilotkit">{children}</CopilotKit>
+    <CopilotKit runtimeUrl="/api/copilotkit" threadId={threadId}>
+      {children}
+    </CopilotKit>
   );
 }
